@@ -246,7 +246,96 @@
               </section>
           </section>
           <section>
+              <section>
               <h2>Podsumowanie</h2>
+              <ul>
+                  <li>FFmpeg ma ogromne możliwości - <pre>ffmpeg -h full</pre></li>
+                  <li>Przy bardziej złożonych potokach przetwarzania, lepiej jest wykorzystać wrapper, taki, jak <pre>ffmpeg-python</pre>.</li>
+                  <li>Podstawowe operacje nie wymagają zagłębiania się w dokumentacje, a potrafią ułatwić życie (przycinanie materiałów, konwersja napisów, kompresja video, ...)</li>
+              </ul>
+              </section>
+
+              <section>
+                  <h2>Dziękuję za uwagę</h2>
+                  <a href="https://github.com/mRokita/pobr-ffmpeg">https://github.com/mRokita/pobr-ffmpeg</a>
+                  <a href="https://mrokita.github.io/pobr-ffmpeg/index.html">https://mrokita.github.io/pobr-ffmpeg/index.html</a>
+              </section>
+              <section>
+              <h2>Bonus - śledzenie postępu</h2>
+              <pre class="r-stretch"><code class="python" data-line-numbers="1-5|8-20|23-35|38|39-44|45-46|47-58|59" data-trim data-noescape>
+                    import socket
+                    from threading import Thread
+                    from contextlib import contextmanager
+                    import tempfile
+                    from pathlib import Path
+
+
+                    @contextmanager
+                    def open_progress_socket():
+                        with tempfile.TemporaryDirectory() as tempdir:
+                            sock = socket.socket(
+                                socket.AF_UNIX, socket.SOCK_STREAM)
+                            socket_filename = Path(tempdir) / "progress.sock"
+                            sock.bind(str(socket_filename))
+                            sock.settimeout(15)
+                            try:
+                                sock.listen(1)
+                                yield sock, socket_filename
+                            finally:
+                                sock.close()
+
+
+                    def watch_progress(sock: socket.socket):
+                        conn, _ = sock.accept()
+                        while rec := conn.recv(4096):
+                            out_time_us = dict(
+                                map(
+                                    lambda x: x.split("="),
+                                    rec.decode("utf-8").split("\n")[:-1],
+                                )
+                            )["out_time_us"]
+                            downloaded_seconds = round(
+                                int(out_time_us) / 1000000
+                            )
+                            print(f"Przetworzono {downloaded_seconds} sekund")
+
+
+                    with open_progress_socket() as (sock, socket_filename):
+                        total_duration = float(
+                            ffmpeg.probe(
+                                "outputs/drive_trim.mp4"
+                            )["streams"][0]["duration"]
+                        )
+                        print(f"Całkowity czas trwania pliku: {total_duration}")
+                        t = Thread(target=watch_progress, args=(sock,))
+                        t.start()
+                        (
+                            ffmpeg.input("outputs/drive_trim.mp4")
+                            .output(
+                                "outputs/drive_h265.mp4",
+                                vcodec="hevc"
+                            )
+                            .overwrite_output()
+                            .global_args(
+                                "-progress",
+                                f"unix://{socket_filename}"
+                            )
+                        ).run(quiet=True)
+                        t.join()
+              </code></pre>
+              </section>
+              <section data-background-color="var(--r-selection-background-color)">
+                  <h2>Śledzenie postępu</h2>
+                <div class="window-frame">
+                    <div class="top-bar">
+                        <div class="control min"></div>
+                        <div class="control max"></div>
+                        <div class="control close"></div>
+                    </div>
+                    <div class="asciinema"
+                         data-cast="assets/canny_edge.cast"></div>
+                </div>
+            </section>
           </section>
 
     </div>
