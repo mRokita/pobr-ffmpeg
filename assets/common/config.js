@@ -88,13 +88,13 @@ function showHud(dontHide){
     if(hudTimeout){
         clearTimeout(hudTimeout)
     }
-    if(dontHide){
+    if(!dontHide){
         hudTimeout = setTimeout(() => {
             let player = document.querySelector('.present .asciinema-player-wrapper')
             console.log('disable hud')
             player.className = player.className.replaceAll(" hud", "")
             console.log(player.className)
-        }, 1000)
+        }, 500)
     }
 
 }

@@ -28,7 +28,6 @@
                     - Używany pod spodem przez Google Chrome, Audacity, Blendera, OBS Studio, Emby/Jellyfin i wiele innych.
                     - Projekt został rozpoczęty w roku 2000 przez Fabrice'a Bellard'a.
 
-                    ---
                 </textarea>
             </section>
         </section>
@@ -63,6 +62,14 @@
                                   vendor_id       : [0][0][0][0]
                       </code></pre>
             </section>
+            <section>
+                <h2>Proste zadanie - przycinanie pliku</h2>
+                <pre><code data-trim data-noescape>
+                    ffmpeg -hide_banner -i drive.mp4 \
+                        -ss 00:00:30 -t 10 \
+                        -y outputs/drive_trim.mp4
+                </code></pre>
+            </section>
             <section data-background-color="var(--r-selection-background-color)">
                 <h2>Oryginalny materiał</h2>
                 <video data-autoplay src="assets/video2.mp4"></video>
@@ -84,7 +91,7 @@
                 <video data-autoplay src="assets/outputs/canny_edge.mp4"></video>
             </section>
             <section>
-                <h2>Złożony filtr</h2>
+                <h2>Złożone filtrowanie</h2>
                 <pre class="r-stretch"><code data-trim data-noescape>
                     ffmpeg -hide_banner -i video2.mp4 \
                       -filter_complex \
@@ -119,10 +126,127 @@
                   <h1>ffmpeg-python</h1>
               </section>
               <section>
-                  <pre class="r-stretch"><code data-trim data-noescape>
+                  <h2>ffmpeg-python</h2>
+                  <ul>
+                      <li>Wygodny <i>wrapper</i> na ffmpeg.</li>
+                      <li>Generuje argumenty dla polecenia ffmpeg na podstawie modelu przetwarzania zdefiniowanego w języku Python.</li>
+                      <li>Udostępnia API pozwalające na wygodne zarządzanie subprocesem ffmpeg'a.</li>
+                  </ul>
+              </section>
+              <section>
+                  <h2>Złożone filtrowanie — cd.</h2>
+                  <pre class="r-stretch"><code data-trim data-noescape data-line-numbers="1|3|5-10|12-16|18|20|22-25" class="python">
+                    import ffmpeg
 
+                    input_video = ffmpeg.input("video2.mp4")
+
+                    hist = (
+                        input_video
+                        .filter("format", "gbrp")
+                        .filter("histogram", display_mode="stack")
+                        .filter("scale", "iw*2", "ih")
+                    )
+
+                    edges = (
+                        input_video
+                        .filter("edgedetect")
+                        .filter("scale", "iw/4", "ih/4")
+                    )
+
+                    hist_overlay = input_video.overlay(hist)
+
+                    out_stream = hist_overlay.overlay(edges, x=1000, y=0)
+
+                    out_stream.output(
+                        f"outputs/histogram_python.mp4"
+                    ).overwrite_output().run()
                   </code></pre>
               </section>
+              <section>
+                  <h2>Wygenerowanie polecenie</h2>
+                  <pre><code data-trim data-noescape>
+                      ffmpeg -i video2.mp4 -filter_complex \
+                                "[0]format=gbrp[s0];\
+                                [s0]histogram=display_mode=stack[s1];\
+                                [s1]scale=iw*2:ih[s2];\
+                                [0][s2]overlay=eof_action=repeat[s3];\
+                                [0]edgedetect[s4];[s4]scale=iw/4:ih/4[s5];\
+                                [s3][s5]overlay=eof_action=repeat:x=1000:y=0[s6]" \
+                             -map [s6] outputs/histogram_python.mp4
+                  </code></pre>
+              </section>
+          </section>
+          <section>
+              <section>
+                <h2>FFMpeg + Python + OpenCV</h2>
+              </section>
+              <section>
+                <h2>FFMpeg + Python + OpenCV</h2>
+                  <div class="mermaid r-stretch">
+                graph TD
+                  subgraph ffmpeg - proces 1
+                      a[outputs/drive_trim.mp4] --> b[zdekompresowane klatki w formacie bgr24]
+                  end
+                  subgraph Python
+                      b -->|stdout, deserializacja| c[tablica numpy]
+                      c -->|cv2.Canny| d[oznaczone krawędzie]
+                  end
+                  subgraph ffmpeg - proces 2
+                      d -->|stdin, serializacja| e[klatki w formacie gray8]
+                      e --> f[outputs/drive_numpy.mp4]
+                  end
+
+            </div>
+              </section>
+              <section>
+                  <h2>FFMpeg + Python + OpenCV</h2>
+                  <pre class="r-stretch"><code data-trim data-noescape data-line-numbers="1-3|5-6|8-12|14-22|24|25-29|30-31|32-34|36-38" class="python">
+                        import ffmpeg
+                        import numpy as np
+                        import cv2
+
+                        width = 1920
+                        height = 800
+
+                        process1 = (
+                            ffmpeg.input("outputs/drive_trim.mp4")
+                            .output("pipe:", format="rawvideo", pix_fmt="bgr24")
+                            .run_async(pipe_stdout=True)
+                        )
+
+                        process2 = (
+                            ffmpeg.input(
+                                "pipe:", format="rawvideo", pix_fmt="gray8",
+                                s=f"{width}x{height}"
+                            )
+                            .output("outputs/drive_numpy.mp4", pix_fmt="yuv420p")
+                            .overwrite_output()
+                            .run_async(pipe_stdin=True)
+                        )
+
+                        while in_bytes := process1.stdout.read(width * height * 3):
+                            in_frame = (
+                                np.frombuffer(in_bytes, np.uint8)
+                                .reshape([height, width, 3])
+                                .astype(np.uint8)
+                            )
+                            out_frame = in_frame.copy()
+                            out_frame = cv2.Canny(out_frame, 50, 150)
+                            process2.stdin.write(
+                                out_frame.astype(np.uint8).tobytes()
+                            )
+
+                        process2.stdin.close()
+                        process1.wait()
+                        process2.wait()
+                  </code></pre>
+              </section>
+              <section data-background-color="var(--r-selection-background-color)">
+                <video data-autoplay src="assets/outputs/drive_numpy.mp4"></video>
+              </section>
+          </section>
+          <section>
+              <h2>Podsumowanie</h2>
           </section>
 
     </div>
