@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="pl">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>POBR - FFMpeg</title>
+    <link rel="stylesheet" href="assets/common/reveal.css">
+    <link rel="stylesheet" href="assets/common/night.css">
+    <link rel="stylesheet" href="assets/common/hljs-ir-black.min.css">
+    <link rel="stylesheet" href="assets/common/asciinema-player.css">
+    <link rel="stylesheet" href="assets/common/style.css">
+</head>
+
+<body>
+<div class="reveal">
+    <div class="slides">
+        <section>
+            <section>
+                <h1>POBR - FFmpeg
+                </h1>
+            </section>
+            <section data-markdown>
+                <textarea data-template>
+                    ## Czym jest FFmpeg
+
+                    - Wielofunkcyjne narzędzie do przetwarzania multimediów.
+                    - Używany pod spodem przez Google Chrome, Audacity, Blendera, OBS Studio, Emby/Jellyfin i wiele innych.
+                    - Projekt został rozpoczęty w roku 2000 przez Fabrice'a Bellard'a.
+
+                    ---
+                </textarea>
+            </section>
+        </section>
+        <section>
+            <section>
+                <h2>ffprobe</h2>
+                    <pre><code data-trim data-noescape>
+                    ffprobe -hide_banner video2.mp4
+                    </code></pre>
+                        <pre class="r-stretch"><code data-trim data-noescape data-line-numbers="1|2-6|7|8-16|17-22">
+                        Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'video2.mp4':
+                          Metadata:
+                            major_brand     : isom
+                            minor_version   : 512
+                            compatible_brands: isomiso2avc1mp41
+                            encoder         : Lavf58.76.100
+                          Duration: 00:00:07.92, start: 0.000000, bitrate: 2839 kb/s
+                          Stream #0:0(jpn):
+                                Video: h264 (High 10) (avc1 / 0x31637661),
+                                       yuv420p10le(tv, bt709),
+                                       1920x1080 (SAR 1:1 DAR 16:9),
+                                       2513 kb/s, 23.98 fps,
+                                       23.98 tbr, 24k tbn, 47.95 tbc (default)
+                                Metadata:
+                                  handler_name    : Video
+                                  vendor_id       : [0][0][0][0]
+                          Stream #0:1(jpn):
+                                Audio: aac (LC) (mp4a / 0x6134706D),
+                                       48000 Hz, 5.1, fltp, 342 kb/s (default)
+                                Metadata:
+                                  handler_name    : Audio
+                                  vendor_id       : [0][0][0][0]
+                      </code></pre>
+            </section>
+            <section data-background-color="var(--r-selection-background-color)">
+                <h2>Oryginalny materiał</h2>
+                <video data-autoplay src="assets/video2.mp4"></video>
+            </section>
+
+            <section data-background-color="var(--r-selection-background-color)">
+                <h2>Wykrywanie krawędzi z użyciem narzędzia ffmpeg</h2>
+                <div class="window-frame">
+                    <div class="top-bar">
+                        <div class="control min"></div>
+                        <div class="control max"></div>
+                        <div class="control close"></div>
+                    </div>
+                    <div class="asciinema"
+                         data-cast="assets/canny_edge.cast"></div>
+                </div>
+            </section>
+            <section data-background-color="var(--r-selection-background-color)">
+                <video data-autoplay src="assets/outputs/canny_edge.mp4"></video>
+            </section>
+            <section>
+                <h2>Złożony filtr</h2>
+                <pre class="r-stretch"><code data-trim data-noescape>
+                    ffmpeg -hide_banner -i video2.mp4 \
+                      -filter_complex \
+                      "[0]format=gbrp,histogram=display_mode=stack[1];\
+                      [1]scale=iw*2:ih[hist];\
+                      [0]edgedetect,scale=iw/4:ih/4[edges];\
+                      [0][hist]overlay[hist_over];\
+                      [hist_over][edges]overlay=x=1000:y=0" \
+                      -y outputs/histogram.mp4
+                </code></pre>
+            </section>
+
+            <section>
+            <div class="mermaid r-stretch">
+                graph TD
+                video.mp4 --> 0
+                0 --> |format=gbrp,<div></div>histogram=display_mode=stack| 1
+                1 -->|scale=iw*2:ih| hist
+                0 -->|edgedetect,scale=iw/4:ih/4| edges
+                0 --> hist_over
+                hist -->|overlay| hist_over
+                hist_over --> out[outputs/histogram.mp4]
+                edges -->|overlay=x=1000:y=0| out[outputs/histogram.mp4]
+            </div>
+                </section>
+            <section data-background-color="var(--r-selection-background-color)">
+                <video data-autoplay src="assets/outputs/histogram.mp4"></video>
+            </section>
+          </section>
+          <section>
+              <section>
+                  <h1>ffmpeg-python</h1>
+              </section>
+              <section>
+                  <pre class="r-stretch"><code data-trim data-noescape>
+
+                  </code></pre>
+              </section>
+          </section>
+
+    </div>
+</div>
+
+<script src="assets/common/asciinema-player.min.js"></script>
+<script src="assets/common/reveal.min.js"></script>
+<script src="assets/common/notes.js"></script>
+<script src="assets/common/markdown.js"></script>
+<script src="assets/common/highlight.js"></script>
+<script src="assets/common/zoom.js"></script>
+<script src="assets/common/mermaid.min.js"></script>
+<script src="assets/common/config.js"></script>
+
+</body>
+
+</html>
